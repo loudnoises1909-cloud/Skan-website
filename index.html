@@ -40,6 +40,21 @@
       pointer-events: none;
     }
 
+    /* blurred copy that fills the sides on wide screens */
+    .page-video--backdrop { display: none; }
+
+    /* wide screens: show the vertical video uncropped in the centre,
+       with a blurred, darkened copy filling the space either side */
+    @media (min-aspect-ratio: 4/5) {
+      .page-video { object-fit: contain; }
+      .page-video--backdrop {
+        display: block;
+        object-fit: cover;
+        filter: blur(40px) brightness(0.45);
+        transform: scale(1.15);
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .page-video { display: none; }
     }
@@ -137,7 +152,8 @@
 <body>
 
   <div class="page">
-    <video class="page-video" autoplay muted loop playsinline preload="auto" aria-hidden="true">
+    <video class="page-video page-video--backdrop" muted loop playsinline aria-hidden="true"></video>
+    <video class="page-video page-video--main" autoplay muted loop playsinline preload="auto" aria-hidden="true">
       <source src="skan-bg.webm" type="video/webm" />
       <source src="skan-bg.mp4" type="video/mp4" />
     </video>
@@ -170,6 +186,39 @@
 
     </div>
   </div>
+
+  <script>
+    // Only load the blurred backdrop copy on wide screens, and keep it in step with the main video.
+    (function () {
+      var main = document.querySelector('.page-video--main');
+      var backdrop = document.querySelector('.page-video--backdrop');
+      var wide = window.matchMedia('(min-aspect-ratio: 4/5)');
+      var still = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var loaded = false;
+
+      function sync() {
+        if (loaded && Math.abs(backdrop.currentTime - main.currentTime) > 0.25) {
+          backdrop.currentTime = main.currentTime;
+        }
+      }
+
+      function update() {
+        if (!wide.matches || still.matches) { if (loaded) backdrop.pause(); return; }
+        if (!loaded) {
+          backdrop.src = main.currentSrc || 'skan-bg.mp4';
+          loaded = true;
+        }
+        sync();
+        backdrop.play().catch(function () {});
+      }
+
+      main.addEventListener('loadedmetadata', update);
+      main.addEventListener('seeked', sync);
+      main.addEventListener('timeupdate', sync);
+      wide.addEventListener('change', update);
+      if (main.readyState >= 1) update();
+    })();
+  </script>
 
 </body>
 </html>
